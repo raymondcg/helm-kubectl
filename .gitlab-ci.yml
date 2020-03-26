@@ -1,0 +1,49 @@
+variables:
+  DOCKER_REPO: necrobraska
+
+services:
+   - docker:dind
+
+stages:
+  - build
+  - push
+
+image: docker:dind
+  
+before_script:
+  - echo -n $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+  
+after_script:
+  - docker logout
+  
+build:
+  stage: build
+  script:
+    - docker pull $DOCKER_REPO/$CI_PROJECT_NAME:latest || true
+    - docker build --pull --cache-from $DOCKER_REPO/$CI_PROJECT_NAME:latest -t $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_SHA .
+    - docker push $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_SHA
+    
+Push Latest:
+  variables:
+    GIT_STRATEGY: none
+  stage: push
+  only:
+    - master
+  script:
+    - docker pull $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_SHA || true
+    - docker tag $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_SHA $DOCKER_REPO/$CI_PROJECT_NAME:latest
+    - docker push $DOCKER_REPO/$CI_PROJECT_NAME:latest
+
+Push Tag and Branch:
+  variables:
+    GIT_STRATEGY: none
+  stage: push
+  only:
+    - tags
+    - branches
+  except:
+    - master
+  script:
+    - docker pull $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_SHA || true
+    - docker tag $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_SHA $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_REF_NAME
+    - docker push $DOCKER_REPO/$CI_PROJECT_NAME:$CI_COMMIT_REF_NAME
